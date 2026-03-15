@@ -1,0 +1,114 @@
+
+
+Target: PortSwigger Web Security Academy
+Lab: Blind SQL injection with conditional responses
+
+Objective
+
+The goal of this lab is to exploit a blind SQL injection vulnerability in the TrackingId cookie in order to retrieve the password of the administrator user and log in to the application.
+
+The application does not directly display SQL query results, but the response changes depending on whether a SQL condition evaluates to true or false.
+
+Step 1 — Identify the Injection Point
+
+While browsing the application, intercept a request using Burp Suite.
+
+Example request:
+
+GET / HTTP/1.1
+Host: LAB-ID.web-security-academy.net
+Cookie: TrackingId=abc123; session=xyz456
+
+Testing the cookie value reveals that the TrackingId parameter is vulnerable to SQL injection.
+
+Test payload:
+
+TrackingId=abc123' AND '1'='1
+
+If the condition is true, the page shows:
+
+"Welcome back!"
+
+Now test a false condition:
+
+TrackingId=abc123' AND '1'='2
+
+The message disappears.
+
+This confirms a Blind SQL Injection vulnerability based on conditional responses.
+
+Step 2 — Confirm Database Interaction
+
+To verify that the database query is being executed:
+
+TrackingId=abc123' AND (SELECT 'a')='a
+
+If the page still displays "Welcome back!", the query is executing successfully.
+
+Step 3 — Determine Password Length
+
+Next, determine the length of the administrator password.
+
+Payload example:
+
+TrackingId=abc123' AND (SELECT LENGTH(password) FROM users WHERE username='administrator')>10--
+
+Adjust the number until the response changes.
+
+Example discovery:
+
+Password length = 20 characters
+
+Step 4 — Extract Password Characters
+
+Now extract the password character by character using SUBSTRING.
+
+Example payload:
+
+TrackingId=abc123' AND SUBSTRING((SELECT password FROM users WHERE username='administrator'),1,1)='a--
+
+If "Welcome back!" appears, the first character is a.
+
+Repeat this process for each position.
+
+Example:
+
+Position 1 → a
+Position 2 → d
+Position 3 → m
+Position 4 → i
+Position 5 → n
+
+Continue until the full password is extracted.
+
+Step 5 — Login as Administrator
+
+Once the full password is discovered:
+
+Go to /login
+
+Enter:
+
+Username: administrator
+Password: extracted_password
+
+Successful login solves the lab.
+
+Tools Used
+
+Burp Suite Repeater
+Burp Suite Intruder (optional for automation)
+
+Key Takeaways
+
+Blind SQL injection occurs when applications do not return query results but still reveal information through behavioral differences in responses.
+
+Conditional responses allow attackers to infer database values by testing true/false conditions.
+
+Example Payload Used
+
+TrackingId=abc123' AND SUBSTRING((SELECT password FROM users WHERE username='administrator'),1,1)='a--
+
+Impact
+
+An attacker could extract sensitive data such as user credentials from the database, potentially leading to full account compromise.
